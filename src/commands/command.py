@@ -4,14 +4,14 @@ from typing import Awaitable, Callable, Self
 
 import discord
 
-COMMAND_PREFIX = "$"
+from ..utils import Result
 
 
-def parse_message(message: discord.Message) -> tuple[str, list[str]]:
+def parse_message(message: discord.Message) -> tuple[str, tuple[str, ...]]:
     content = message.content
     splitted_contents = content.split(" ")
     command = splitted_contents.pop(0)
-    return command, splitted_contents
+    return command, tuple(splitted_contents)
 
 
 @dataclass(frozen=True)
@@ -19,35 +19,33 @@ class Command(metaclass=abc.ABCMeta):
     name: str
     description: str
     usage: str
-    process: Callable[[discord.Message], Awaitable[None]]
+    process: Callable[[tuple[str, ...]], Awaitable[Result[str, str]]]
 
-    async def exec(self, message: discord.Message) -> None:
-        await self.process(message)
+    async def exec(self, *args: str) -> Result[str, str]:
+        return await self.process(*args)
 
     def __str__(self) -> str:
-        return f"name: {self.name}\n{self.description}\nusage: {self.usage}"
+        return f"\n## {self.name}\n\n{self.description}\n使い方：`{self.usage}`"
 
 
 class Commands(tuple[Command, ...]):
+    def is_empty(self) -> bool:
+        return len(self) == 0
+
     def map[T](self, function: Callable[[Command], T]) -> tuple[T]:
-        return tuple(map(function, Self))
+        return tuple(map(function, self))
 
-    def filter_with_name(self, name: str) -> Self:
-        return tuple(filter(lambda c: c.name == name, self))
+    def filter(self, function: Callable[[Command], bool]) -> Self:
+        return Commands(filter(function, self))
 
-    def search_from_message(self, message: discord.Message) -> Command | None:
-        name, _ = parse_message(message)
+    def search_from_name(self, name: str) -> Command | None:
+        commands = self.filter(lambda c: c.name == name)
 
-        if not name.startswith(COMMAND_PREFIX):
-            return None
-
-        commands = self.filter_with_name(name[1:])
-
-        if len(commands) == 0:
+        if self.is_empty():
             return None
         else:
             return commands[0]
 
     def show_all(self) -> str:
         printable_commands = self.map(lambda command: str(command))
-        return "\n\n".join(printable_commands)
+        return "\n".join(printable_commands)

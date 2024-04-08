@@ -1,31 +1,17 @@
 import random
 
-import discord
-
-from ..utils import send_message
-from .command import Command, parse_message
+from ..utils import Failure, Result, Success
+from .command import Command
 
 
-async def _roll(message: discord.Message) -> None:
-    _, args = parse_message(message)
-
+async def _roll(*args: str) -> Result[str, str]:
     if len(args) == 0:
-        await send_message(
-            message.channel,
-            "引数が足りないよ。`$dice {サイコロの個数}d{サイコロの面数}`で指定してね。",
-            mention_at=message.author,
-        )
-        return
+        return Failure("引数が足りないよ。")
 
     numbers = args[0].split("d")
 
     if len(numbers) < 2:
-        await send_message(
-            message.channel,
-            "引数のフォーマットが違うよ。`$dice {サイコロの個数}d{サイコロの面数}`で指定してね。",
-            mention_at=message.author,
-        )
-        return
+        return Failure("引数のフォーマットが違うよ。")
 
     try:
         num_of_dice = int(numbers[0])
@@ -33,19 +19,12 @@ async def _roll(message: discord.Message) -> None:
         results = list(
             map(lambda _: str(random.randint(1, num_of_sides)), range(0, num_of_dice))
         )
-        await send_message(
-            message.channel,
-            ", ".join(results),
-            mention_at=message.author,
-        )
+
+        return Success(", ".join(results))
     except ValueError:
-        await send_message(
-            message.channel,
-            "個数と面数は数字で指定してね。`$dice {サイコロの個数}d{サイコロの面数}`で指定してね。",
-            mention_at=message.author,
-        )
+        return Failure("個数と面数は整数で指定してね。")
 
 
 roll = Command(
-    "roll", "サイコロを振ります。", "`$dice {サイコロの個数}d{サイコロの面数}`", _roll
+    "roll", "サイコロを振ります。", "$roll {サイコロの個数}d{サイコロの面数}", _roll
 )
