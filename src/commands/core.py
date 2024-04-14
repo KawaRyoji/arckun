@@ -1,10 +1,12 @@
 import abc
 from dataclasses import dataclass
-from typing import Awaitable, Callable, Self
+from typing import Callable, Self
 
 import discord
 
-from ..utils import Result
+from ..utils import Failure, Result, Success
+
+COMMAND_PREFIX = "$"  # コマンドメッセージのプレフィックス
 
 
 def parse_message(message: discord.Message) -> tuple[str, tuple[str, ...]]:
@@ -15,17 +17,21 @@ def parse_message(message: discord.Message) -> tuple[str, tuple[str, ...]]:
 
 
 @dataclass(frozen=True)
-class Command(metaclass=abc.ABCMeta):
+class Command[S, F](metaclass=abc.ABCMeta):
     name: str
     description: str
     usage: str
-    process: Callable[[tuple[str, ...]], Awaitable[Result[str, str]]]
 
-    async def exec(self, *args: str) -> Result[str, str]:
-        return await self.process(*args)
+    @abc.abstractmethod
+    async def exec(self, *args: str) -> Result[S, F]:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    async def response(self, result: Result[S, F], message: discord.Message) -> None:
+        raise NotImplementedError()
 
     def __str__(self) -> str:
-        return f"\n## {self.name}\n\n{self.description}\n使い方：`{self.usage}`"
+        return f"## {self.name}\n{self.description}\n使い方：`{self.usage}`"
 
 
 class Commands(tuple[Command, ...]):
@@ -41,7 +47,7 @@ class Commands(tuple[Command, ...]):
     def search_from_name(self, name: str) -> Command | None:
         commands = self.filter(lambda c: c.name == name)
 
-        if self.is_empty():
+        if commands.is_empty():
             return None
         else:
             return commands[0]
@@ -49,3 +55,13 @@ class Commands(tuple[Command, ...]):
     def show_all(self) -> str:
         printable_commands = self.map(lambda command: str(command))
         return "\n".join(printable_commands)
+
+
+async def response_using_text_message(
+    result: Result[str, str], message: discord.Message, usage: str
+) -> None:
+    match result:
+        case Success():
+            await message.reply(result.value)
+        case Failure():
+            await message.reply(result.value + "\n使い方：`" + usage + "`")

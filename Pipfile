@@ -5,8 +5,11 @@ name = "pypi"
 
 [packages]
 discord = "*"
+requests = "*"
+tabulate = {extras = ["widechars"], version = "*"}
 
 [dev-packages]
+black = "*"
 
 [requires]
 python_version = "3.12"
