@@ -6,7 +6,6 @@ import discord
 from .commands import commands
 from .commands.core import COMMAND_PREFIX, parse_message
 from .commands.special import command_list, help
-from .utils import send_message
 
 # presence, members, message_content以外のインテントを有効にする設定
 intents = discord.Intents.default()
@@ -48,11 +47,7 @@ async def on_message(message: discord.Message) -> None:
         await command.response(result, message)
 
     except Exception as e:
-        await send_message(
-            message.channel,
-            "予期せぬエラーが発生しました。\n" + str(e),
-            mention_at=message.author,
-        )
+        message.reply("予期せぬエラーが発生しました。\n" + str(e))
 
 
 with open("./env.json", "r") as f:

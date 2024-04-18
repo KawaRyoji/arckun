@@ -64,4 +64,10 @@ async def response_using_text_message(
         case Success():
             await message.reply(result.value)
         case Failure():
-            await message.reply(result.value + "\n使い方：`" + usage + "`")
+            await on_failure_with_usage(result, message, usage)
+
+
+async def on_failure_with_usage(
+    failure: Failure[str], message: discord.Message, usage: str
+) -> None:
+    await message.reply(failure.value + "\n使い方：`" + usage + "`")
