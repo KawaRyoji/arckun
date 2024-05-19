@@ -1,29 +1,30 @@
 import random
 from typing import override
 
-from discord import Message
+import discord
 
-from ..utils import Failure, Result, Success
-from .core import Command, response_using_text_message
+from .core import Command, Response
 
 
-class Roll(Command[str, str]):
+class Roll(Command):
     @override
-    async def exec(self, *args: str) -> Result[str, str]:
+    def exec(self, source_message: discord.Message, *args: str) -> Response:
+        failure = Response.failure(self)
+
         if len(args) == 0:
-            return Failure("引数が足りないよ。")
+            return failure("引数が足りないよ。")
 
         numbers = args[0].split("d")
 
         if len(numbers) < 2:
-            return Failure("引数のフォーマットが違うよ。")
+            return failure("引数のフォーマットが違うよ。")
 
         try:
             dice = int(numbers[0])
             sides = int(numbers[1])
 
             if dice < 1 or dice > 100 or sides < 1 or sides > 100:
-                return Success("回数と面数は1から99以下にしてね。")
+                return Response("回数と面数は1から99以下にしてね。")
 
             results = list(
                 map(
@@ -32,13 +33,6 @@ class Roll(Command[str, str]):
                 )
             )
 
-            return Success(", ".join(results))
+            return Response(", ".join(results))
         except ValueError:
-            return Failure("個数と面数は整数で指定してね。")
-
-    @override
-    async def response(self, result: Result[str, str], message: Message) -> None:
-        await response_using_text_message(result, message, self.usage)
-
-
-roll = Roll("roll", "サイコロを振るよ。", "$roll {サイコロの個数}d{サイコロの面数}")
+            return failure("個数と面数は整数で指定してね。")

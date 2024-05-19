@@ -1,11 +1,10 @@
 from typing import Any, override
 
+import discord
 import requests
 import tabulate
-from discord import Message
 
-from ..utils import Failure, Result, Success
-from .core import Command, response_using_text_message
+from .core import Command, Response
 
 codes = [
     {
@@ -401,17 +400,17 @@ def format_response(response: dict[str, Any]) -> str:
     )
 
 
-class Tenki(Command[str, str]):
+class Tenki(Command):
     @override
-    async def exec(self, *args: str) -> Result[str, str]:
+    def exec(self, source_message: discord.Message, *args: str) -> Response:
         if len(args) < 1:
-            return Failure("引数が足りないよ。")
+            return Response.failure(self)("引数が足りないよ。")
 
         todouhuken = args[0]
 
         maybe_cities = get_cities(todouhuken)
         if maybe_cities is None:
-            return Success(todouhuken + "は日本に存在しないよ。")
+            return Response(todouhuken + "は日本に存在しないよ。")
 
         cities = maybe_cities
 
@@ -423,15 +422,4 @@ class Tenki(Command[str, str]):
                 cities,
             )
         )
-        return Success("\n".join(list(map(format_response, responses))))
-
-    @override
-    async def response(self, result: Result[str, str], message: Message) -> None:
-        await response_using_text_message(result, message, self.usage)
-
-
-tenki = Tenki(
-    "tenki",
-    "都道府県の天気予報をだすよ。\n北海道は道南，道北，道東，道央に分かれてるよ。",
-    "$tenki {都道府県}",
-)
+        return Response("\n".join(list(map(format_response, responses))))

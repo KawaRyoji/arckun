@@ -1,73 +1,54 @@
+from __future__ import annotations
+
 import abc
 from dataclasses import dataclass
-from typing import Callable, Self
+from typing import Callable
 
 import discord
-
-from ..utils import Failure, Result, Success
 
 COMMAND_PREFIX = "$"  # コマンドメッセージのプレフィックス
 
 
-def parse_message(message: discord.Message) -> tuple[str, tuple[str, ...]]:
+def parse_message(message: discord.Message) -> tuple[str, tuple[str, ...]] | None:
     content = message.content
+    if not content.startswith(COMMAND_PREFIX):
+        return None
     splitted_contents = content.split(" ")
     command = splitted_contents.pop(0)
-    return command, tuple(splitted_contents)
+    return command[1:], tuple(splitted_contents)
 
 
 @dataclass(frozen=True)
-class Command[S, F](metaclass=abc.ABCMeta):
+class Command(metaclass=abc.ABCMeta):
     name: str
     description: str
     usage: str
 
     @abc.abstractmethod
-    async def exec(self, *args: str) -> Result[S, F]:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    async def response(self, result: Result[S, F], message: discord.Message) -> None:
+    def exec(self, source_message: discord.Message, *args: str) -> Response:
         raise NotImplementedError()
 
     def __str__(self) -> str:
         return f"## {self.name}\n{self.description}\n使い方：`{self.usage}`"
 
 
-class Commands(tuple[Command, ...]):
-    def is_empty(self) -> bool:
-        return len(self) == 0
+@dataclass(frozen=True)
+class Response:
+    content: str | None
+    embed: discord.Embed | None = None
+    view: discord.ui.View | None = None
+    delete_after: float | None = None
 
-    def map[T](self, function: Callable[[Command], T]) -> tuple[T]:
-        return tuple(map(function, self))
+    async def send(self, source_message: discord.Message) -> None:
+        await source_message.reply(
+            content=self.content,
+            embed=self.embed,
+            view=self.view,
+            delete_after=self.delete_after,
+        )
 
-    def filter(self, function: Callable[[Command], bool]) -> Self:
-        return Commands(filter(function, self))
-
-    def search_from_name(self, name: str) -> Command | None:
-        commands = self.filter(lambda c: c.name == name)
-
-        if commands.is_empty():
-            return None
-        else:
-            return commands[0]
-
-    def show_all(self) -> str:
-        printable_commands = self.map(lambda command: str(command))
-        return "\n".join(printable_commands)
-
-
-async def response_using_text_message(
-    result: Result[str, str], message: discord.Message, usage: str
-) -> None:
-    match result:
-        case Success():
-            await message.reply(result.value)
-        case Failure():
-            await on_failure_with_usage(result, message, usage)
-
-
-async def on_failure_with_usage(
-    failure: Failure[str], message: discord.Message, usage: str
-) -> None:
-    await message.reply(failure.value + "\n使い方：`" + usage + "`")
+    @classmethod
+    def failure(cls, command: Command) -> Callable[[str], Response]:
+        return lambda content: cls(
+            content=content + "\n使い方：`" + command.usage + "`"
+        )

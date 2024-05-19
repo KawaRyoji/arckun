@@ -15,6 +15,19 @@ class Failure[E]:
 type Result[T, E] = Success[T] | Failure[E]
 
 
+@dataclass(frozen=True)
+class Just[T]:
+    value: T
+
+
+@dataclass(frozen=True)
+class Nothing:
+    pass
+
+
+type Maybe[T] = Just[T] | Nothing
+
+
 def use_state[T](init: T) -> tuple[Callable[[], T], Callable[[T], None]]:
     state = init
 

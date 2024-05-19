@@ -3,9 +3,8 @@ from typing import Any
 
 import discord
 
-from .commands import commands
-from .commands.core import COMMAND_PREFIX, parse_message
-from .commands.special import command_list, help
+from .commands.core import parse_message
+from .commands.factory import create_command
 
 # presence, members, message_content以外のインテントを有効にする設定
 intents = discord.Intents.default()
@@ -24,30 +23,23 @@ async def on_message(message: discord.Message) -> None:
     if message.author == client.user:  # bot自身のメッセージには反応しない
         return
 
-    print("received: " + message.content)
-
     try:
-        name, args = parse_message(message)
+        maybe_content = parse_message(message)
 
-        if not name.startswith(COMMAND_PREFIX):
+        if maybe_content is None:
             return
 
-        name = name[1:]
-        if name == "commands":
-            command = command_list
-        elif name == "help":
-            command = help
-        else:
-            maybe_command = commands.search_from_name(name)
-            if maybe_command is None:
-                return
-            command = maybe_command
+        name, args = maybe_content
+        command = create_command(name)
 
-        result = None if command is None else await command.exec(*args)
-        await command.response(result, message)
+        if command is None:
+            return
+
+        response = command.exec(message, *args)
+        await response.send(message)
 
     except Exception as e:
-        message.reply("予期せぬエラーが発生しました。\n" + str(e))
+        await message.reply("予期せぬエラーが発生しました。\n" + str(e))
 
 
 with open("./env.json", "r") as f:
